@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BreathSentry Monitor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+color-scheme: light;
+--surface-1:      #fcfcfb;
+--page-plane:     #f9f9f7;
+--text-primary:   #0b0b0b;
+--text-secondary: #52514e;
+--text-muted:     #898781;
+--grid:           #e1e0d9;
+--baseline:       #c3c2b7;
+--border:         rgba(11,11,11,0.10);
+--accent:         #2a78d6;
+--accent-soft:    #e7f0fb;
+--good:           #0ca30c;
+--good-soft:      #e5f7e5;
+--warning:        #b8780a;
+--warning-soft:   #fef3da;
+--serious:        #c15a34;
+--serious-soft:   #fbe6dc;
+--critical:       #d03b3b;
+--critical-soft:  #fbe2e2;
+font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page-plane); color: var(--text-primary); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 20px 16px 56px; }
+.num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px 0 18px; border-bottom: 1px solid var(--border); }
+.brand { display: flex; flex-direction: column; gap: 4px; }
+.brand h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.brand p { margin: 0; font-size: 13px; color: var(--text-secondary); max-width: 46ch; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 10px; border-radius: 999px; }
+.badge.demo { background: var(--warning-soft); color: var(--warning); }
+.badge.demo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
+.badge.room { background: var(--accent-soft); color: var(--accent); }
+.controls { display: flex; align-items: center; gap: 10px; padding: 14px 0; flex-wrap: wrap; }
+.controls .phase-label { font-size: 13px; color: var(--text-secondary); margin-right: 4px; }
+button.ctl { font: inherit; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; }
+button.ctl:hover { border-color: var(--accent); color: var(--accent); }
+button.ctl.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.ctl.primary:hover { opacity: 0.92; color: #fff; }
+button.ctl:disabled { opacity: 0.45; cursor: default; }
+button.ctl:disabled:hover { border-color: var(--border); color: var(--text-primary); }
+.hero { display: grid; grid-template-columns: 320px 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+.panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.panel h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.gauge-panel { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.gauge-wrap { position: relative; width: 220px; height: 130px; }
+.gauge-figure { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 6px; }
+.gauge-value { font-size: 40px; font-weight: 700; line-height: 1; }
+.gauge-unit { font-size: 14px; color: var(--text-secondary); margin-top: 2px; }
+.risk-pill { margin-top: 14px; display: inline-flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.risk-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+.risk-pill.good { background: var(--good-soft); color: var(--good); }
+.risk-pill.good .dot { background: var(--good); }
+.risk-pill.warning { background: var(--warning-soft); color: var(--warning); }
+.risk-pill.warning .dot { background: var(--warning); }
+.risk-pill.serious { background: var(--serious-soft); color: var(--serious); }
+.risk-pill.serious .dot { background: var(--serious); }
+.risk-pill.critical { background: var(--critical-soft); color: var(--critical); }
+.risk-pill.critical .dot { background: var(--critical); }
+.gauge-sub { margin-top: 12px; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.gauge-sub .num { color: var(--text-secondary); }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.tile-value { font-size: 22px; font-weight: 700; }
+.tile-value .unit { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+.tile.occupancy .tile-value { font-size: 16px; display: flex; align-items: center; gap: 7px; }
+.occ-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--baseline); }
+.occ-dot.on { background: var(--accent); }
+.mid-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 760px) { .mid-grid { grid-template-columns: 1fr; } }
+.chart-card canvas { max-height: 220px; }
+.chart-caption { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.eq-panel .eq-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.eq-panel .eq-row:last-child { border-bottom: none; }
+.eq-panel .eq-name { color: var(--text-secondary); }
+.eq-panel .eq-val { font-weight: 600; }
+.events-panel { margin-top: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--grid); }
+th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+td.empty-row { color: var(--text-muted); font-style: normal; padding: 18px 6px; }
+.event-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.event-label .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.access-panel { margin-top: 16px; }
+.access-panel .steps { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); margin-top: 4px; }
+@media (max-width: 760px) { .access-panel .steps { grid-template-columns: 1fr; } }
+.step-card { background: var(--page-plane); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.step-card .step-no { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); font-weight: 600; }
+.step-card p { margin: 6px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+footer { margin-top: 28px; font-size: 12px; color: var(--text-muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="brand">
+<h1>BreathSentry</h1>
+<p>Contact-free early-warning monitor for shared rooms — acoustic cough/sneeze detection fused with CO2-derived ventilation risk.</p>
+</div>
+<div class="badges">
+<span class="badge demo">Simulated demo data</span>
+<span class="badge room">Room 01</span>
+</div>
+</header>
+<div class="controls">
+<span class="phase-label" id="phase-label">Ready — press Play to walk through a session</span>
+<button class="ctl primary" id="btn-play">Play demo</button>
+<button class="ctl" id="btn-step">Step</button>
+<button class="ctl" id="btn-reset">Reset</button>
+</div>
+<div class="hero">
+<div class="panel gauge-panel">
+<h2>Infection risk (Wells-Riley)</h2>
+<div class="gauge-wrap">
+<svg viewBox="0 0 220 130" width="220" height="130">
+<path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="var(--grid)" stroke-width="16" stroke-linecap="round"/>
+<path id="gauge-arc" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="var(--good)" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 283" />
+</svg>
+<div class="gauge-figure">
+<div class="gauge-value num" id="risk-value">--</div>
+<div class="gauge-unit">percent, 1hr exposure</div>
+</div>
+</div>
+<div class="risk-pill good" id="risk-pill"><span class="dot"></span><span id="risk-pill-text">Awaiting data</span></div>
+<div class="gauge-sub" id="gauge-sub">Ventilation rate not yet estimated.</div>
+</div>
+<div class="tiles">
+<div class="tile">
+<div class="tile-label">CO2</div>
+<div class="tile-value num"><span id="co2-value">420</span><span class="unit">ppm</span></div>
+</div>
+<div class="tile">
+<div class="tile-label">TVOC</div>
+<div class="tile-value num"><span id="tvoc-value">0</span><span class="unit">ppb</span></div>
+</div>
+<div class="tile">
+<div class="tile-label">Temperature</div>
+<div class="tile-value num"><span id="temp-value">24.0</span><span class="unit">&deg;C</span></div>
+</div>
+<div class="tile">
+<div class="tile-label">Humidity</div>
+<div class="tile-value num"><span id="humidity-value">44</span><span class="unit">%</span></div>
+</div>
+<div class="tile occupancy" style="grid-column: span 2;">
+<div class="tile-label">Occupancy (HLK-LD2410)</div>
+<div class="tile-value"><span class="occ-dot" id="occ-dot"></span><span id="occ-value">Empty</span></div>
+</div>
+</div>
+</div>
+<div class="mid-grid">
+<div class="panel chart-card">
+<h2>CO2 trend</h2>
+<canvas id="co2-chart" height="90"></canvas>
+<div class="chart-caption">Rebreathed-air proxy — rising CO2 tracks how much exhaled air is building up in the room.</div>
+</div>
+<div class="panel eq-panel">
+<h2>Live model inputs</h2>
+<div class="eq-row"><span class="eq-name">Outdoor CO2 baseline</span><span class="eq-val num">420 ppm</span></div>
+<div class="eq-row"><span class="eq-name">CO2 generation rate</span><span class="eq-val num">0.005 L/s</span></div>
+<div class="eq-row"><span class="eq-name">Quanta generation (assumed)</span><span class="eq-val num">25 /hr</span></div>
+<div class="eq-row"><span class="eq-name">Breathing rate (assumed)</span><span class="eq-val num">0.4 m&sup3;/hr</span></div>
+<div class="eq-row"><span class="eq-name">Ventilation Q/occupant</span><span class="eq-val num" id="q-value">--</span></div>
+<div class="eq-row"><span class="eq-name">P = 1&minus;exp(&minus;IqpT/Q)</span><span class="eq-val num" id="p-formula-value">--</span></div>
+</div>
+</div>
+<div class="panel events-panel">
+<h2>Acoustic events</h2>
+<table>
+<thead><tr><th>Time</th><th>Label</th><th>Confidence</th><th>Method</th></tr></thead>
+<tbody id="events-body">
+<tr><td class="empty-row" colspan="4">No acoustic events yet this session.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="panel access-panel">
+<h2>How to access this in the classroom</h2>
+<div class="steps">
+<div class="step-card">
+<div class="step-no">01</div>
+<p>This page is a shareable link — open it on any laptop, phone, or the room projector. Nothing to install; it works exactly like this for anyone with the URL.</p>
+</div>
+<div class="step-card">
+<div class="step-no">02</div>
+<p>Right now it plays back a real recorded test session (same numbers verified against the actual CO2/Wells-Riley code) since the physical sensors haven't been wired up yet.</p>
+</div>
+<div class="step-card">
+<div class="step-no">03</div>
+<p>Once the ESP32 + Raspberry Pi are running, the same dashboard design (in the project's <code>dashboard/</code> folder) connects live over MQTT — see the project README for hosting it so this page can show real readings too.</p>
+</div>
+</div>
+</div>
+<footer>BreathSentry — IEEE BPDC IoT course project · dashboard build 2026-09-28</footer>
+</div>
+<script>
+(function () {
+"use strict";
+const CO2_OUTDOOR_PPM = 420;
+const CO2_GEN_RATE_LPS = 0.005;
+const QUANTA_PER_HR = 25;
+const BREATHING_RATE_M3_HR = 0.4;
+const EXPOSURE_HR = 1.0;
+function ventilationSteadyState(co2ppm, occupants) {
+const deltaPpm = Math.max(co2ppm - CO2_OUTDOOR_PPM, 1e-6);
+const qTotalLps = (CO2_GEN_RATE_LPS * occupants) / (deltaPpm * 1e-6);
+return qTotalLps / occupants;
+}
+function wellsRiley(qLps) {
+const qM3Hr = qLps * 3.6;
+if (qM3Hr <= 0) return 1.0;
+const exponent = -(1 * QUANTA_PER_HR * BREATHING_RATE_M3_HR * EXPOSURE_HR) / qM3Hr;
+return 1 - Math.exp(exponent);
+}
+function riskBand(pct) {
+if (pct < 10) return { cls: "good", label: "Low risk" };
+if (pct < 25) return { cls: "warning", label: "Elevated — improve ventilation" };
+if (pct < 45) return { cls: "serious", label: "High — open windows / reduce occupancy" };
+return { cls: "critical", label: "Critical — evacuate / ventilate immediately" };
+}
+const script = [
+{ occ: false, co2: 420, tvoc: 5, temp: 24.0, hum: 44, note: "Room empty, baseline air" },
+{ occ: true,  co2: 430, tvoc: 40, temp: 24.2, hum: 44, note: "Room occupied" },
+{ occ: true,  co2: 520, tvoc: 70, temp: 24.3, hum: 45 },
+{ occ: true,  co2: 640, tvoc: 100, temp: 24.4, hum: 45 },
+{ occ: true,  co2: 760, tvoc: 130, temp: 24.4, hum: 46 },
+{ occ: true,  co2: 880, tvoc: 160, temp: 24.5, hum: 46 },
+{ occ: true,  co2: 1000, tvoc: 180, temp: 24.5, hum: 46, note: "CO2 plateaus — steady state reached" },
+{ occ: true,  co2: 1002, tvoc: 180, temp: 24.5, hum: 46, event: { label: "sneeze", confidence: 0.83, method: "heuristic" } },
+{ occ: false, co2: 900,  tvoc: 130, temp: 24.4, hum: 45, note: "Room clears — CO2 decaying back to baseline" },
+{ occ: false, co2: 730,  tvoc: 100, temp: 24.3, hum: 45 },
+{ occ: false, co2: 545,  tvoc: 80,  temp: 24.3, hum: 45, note: "Back near baseline" },
+];
+let stepIndex = 0;
+let playing = false;
+let playTimer = null;
+const co2Labels = [];
+const co2Data = [];
+const co2Ctx = document.getElementById("co2-chart");
+const co2Chart = new Chart(co2Ctx, {
+type: "line",
+data: {
+labels: co2Labels,
+datasets: [{
+data: co2Data,
+borderColor: "#2a78d6",
+backgroundColor: "rgba(42,120,214,0.10)",
+borderWidth: 2,
+tension: 0.3,
+fill: true,
+pointRadius: 2,
+pointBackgroundColor: "#2a78d6",
+}],
+},
+options: {
+animation: { duration: 300 },
+plugins: { legend: { display: false } },
+scales: {
+x: { grid: { display: false }, ticks: { color: "#898781", font: { family: "IBM Plex Mono", size: 10 } } },
+y: { grid: { color: "#e1e0d9" }, ticks: { color: "#898781", font: { family: "IBM Plex Mono", size: 10 } }, suggestedMin: 380, suggestedMax: 1100 },
+},
+},
+});
+const el = (id) => document.getElementById(id);
+const phaseLabel = el("phase-label");
+const riskValue = el("risk-value");
+const riskPill = el("risk-pill");
+const riskPillText = el("risk-pill-text");
+const gaugeArc = el("gauge-arc");
+const gaugeSub = el("gauge-sub");
+const qValue = el("q-value");
+const pFormulaValue = el("p-formula-value");
+const eventsBody = el("events-body");
+const ARC_LENGTH = 283; // approx path length of the drawn arc
+function setGauge(pct) {
+const clamped = Math.max(0, Math.min(100, pct));
+const frac = clamped / 100;
+gaugeArc.setAttribute("stroke-dasharray", (frac * ARC_LENGTH).toFixed(1) + " " + ARC_LENGTH);
+const band = riskBand(clamped);
+gaugeArc.style.stroke = getComputedStyle(document.documentElement).getPropertyValue("--" + band.cls);
+riskPill.className = "risk-pill " + band.cls;
+riskPillText.textContent = band.label;
+riskValue.textContent = clamped.toFixed(1);
+}
+function addEvent(time, evt) {
+if (eventsBody.querySelector(".empty-row")) eventsBody.innerHTML = "";
+const row = document.createElement("tr");
+row.innerHTML =
+"<td class=\"num\">" + time + "</td>" +
+"<td><span class=\"event-label\"><span class=\"dot\"></span>" + evt.label + "</span></td>" +
+"<td class=\"num\">" + Math.round(evt.confidence * 100) + "%</td>" +
+"<td>" + evt.method + "</td>";
+eventsBody.prepend(row);
+}
+function applyStep(i) {
+const s = script[i];
+el("co2-value").textContent = s.co2;
+el("tvoc-value").textContent = s.tvoc;
+el("temp-value").textContent = s.temp.toFixed(1);
+el("humidity-value").textContent = s.hum;
+el("occ-value").textContent = s.occ ? "Occupied" : "Empty";
+el("occ-dot").className = "occ-dot" + (s.occ ? " on" : "");
+co2Labels.push("t" + i);
+co2Data.push(s.co2);
+if (co2Labels.length > 14) { co2Labels.shift(); co2Data.shift(); }
+co2Chart.update();
+if (s.co2 > CO2_OUTDOOR_PPM + 20) {
+const q = ventilationSteadyState(s.co2, 1);
+const p = wellsRiley(q) * 100;
+setGauge(p);
+qValue.textContent = q.toFixed(2) + " L/s";
+pFormulaValue.textContent = p.toFixed(1) + " %";
+gaugeSub.innerHTML = "Ventilation: <span class=\"num\">" + q.toFixed(2) + " L/s/occupant</span> · steady-state estimate";
+} else {
+setGauge(0);
+qValue.textContent = "--";
+pFormulaValue.textContent = "--";
+gaugeSub.textContent = "CO2 near baseline — negligible rebreathed-air risk.";
+}
+if (s.event) {
+const t = new Date();
+const label = t.toTimeString().slice(0, 8);
+addEvent(label, s.event);
+}
+phaseLabel.textContent = s.note ? s.note : ("Step " + (i + 1) + " of " + script.length);
+}
+function reset() {
+stepIndex = 0;
+co2Labels.length = 0;
+co2Data.length = 0;
+co2Chart.update();
+eventsBody.innerHTML = "<tr><td class=\"empty-row\" colspan=\"4\">No acoustic events yet this session.</td></tr>";
+setGauge(0);
+qValue.textContent = "--";
+pFormulaValue.textContent = "--";
+gaugeSub.textContent = "Ventilation rate not yet estimated.";
+el("co2-value").textContent = "420";
+el("tvoc-value").textContent = "0";
+el("temp-value").textContent = "24.0";
+el("humidity-value").textContent = "44";
+el("occ-value").textContent = "Empty";
+el("occ-dot").className = "occ-dot";
+phaseLabel.textContent = "Ready — press Play to walk through a session";
+stopPlaying();
+updateButtons();
+}
+function step() {
+if (stepIndex >= script.length) { stopPlaying(); return; }
+applyStep(stepIndex);
+stepIndex += 1;
+updateButtons();
+if (stepIndex >= script.length) stopPlaying();
+}
+function updateButtons() {
+const done = stepIndex >= script.length;
+el("btn-step").disabled = done;
+el("btn-play").textContent = playing ? "Pause" : "Play demo";
+el("btn-play").disabled = done && !playing;
+}
+function startPlaying() {
+playing = true;
+updateButtons();
+playTimer = setInterval(function () {
+step();
+if (stepIndex >= script.length) stopPlaying();
+}, 1400);
+}
+function stopPlaying() {
+playing = false;
+if (playTimer) { clearInterval(playTimer); playTimer = null; }
+updateButtons();
+}
+el("btn-play").addEventListener("click", function () {
+if (playing) stopPlaying(); else startPlaying();
+});
+el("btn-step").addEventListener("click", function () {
+if (playing) stopPlaying();
+step();
+});
+el("btn-reset").addEventListener("click", reset);
+reset();
+})();
+</script>
+</body>
+</html>
