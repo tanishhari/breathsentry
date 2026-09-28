@@ -252,7 +252,7 @@ const lab=[],dat=[];
 const chart=new Chart($("chart"),{type:"line",data:{labels:lab,datasets:[{data:dat,borderColor:"#0e7c86",borderWidth:2.5,tension:.35,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:"#fff",pointBorderColor:"#0e7c86",pointBorderWidth:2,fill:false}]},
 options:{maintainAspectRatio:false,animation:{duration:350},interaction:{mode:"index",intersect:false},
 plugins:{legend:{display:false},tooltip:{backgroundColor:"#0b2545",padding:10,displayColors:false,callbacks:{label:c=>"CO₂  "+c.parsed.y+" ppm"}}},
-scales:{x:{grid:{display:false},ticks:{color:"#8392a5",font:{family:"JetBrains Mono",size:10}}},y:{min:350,max:1300,grid:{color:"rgba(15,28,46,.06)"},ticks:{color:"#8392a5",stepSize:200,font:{family:"JetBrains Mono",size:10}}}}},plugins:[bands]});
+scales:{x:{grid:{display:false},ticks:{color:"#8392a5",font:{family:"JetBrains Mono",size:10}}},y:{min:350,max:1300,afterFit(sc){sc.width=48},grid:{color:"rgba(15,28,46,.06)"},ticks:{color:"#8392a5",stepSize:200,font:{family:"JetBrains Mono",size:10}}}},layout:{padding:{left:4}}},plugins:[bands]});document.fonts&&document.fonts.ready.then(()=>chart.update());
 /* sparklines */
 const hist={co2:[],q:[],tvoc:[],temp:[],hum:[]};
 function spark(id,arr){const el=$(id);if(arr.length<2){el.innerHTML="";return}const mn=Math.min(...arr),mx=Math.max(...arr),r=mx-mn||1;
